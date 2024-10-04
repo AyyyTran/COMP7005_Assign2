@@ -2,23 +2,21 @@ import socket
 import argparse
 import os
 
-BUFFER_SIZE = 4096  # Same buffer size as server
-
+BUFFER_SIZE = 4096  
 def send_file_content(client_socket, file_path):
     """Send the file content to the server."""
     try:
         with open(file_path, 'rb') as file:
             while True:
                 data = file.read(BUFFER_SIZE)
-                if not data:  # End of file
-                    print("Finished sending file data.")  # Debugging line
+                if not data:  
+                    print("Finished sending file data.")  
                     break
                 client_socket.sendall(data)
-                print(f"Sent {len(data)} bytes to server.")  # Debugging line
+                print(f"Sent {len(data)} bytes to server.")  
 
-        # Close the socket explicitly after sending the file to signal the end of transmission
-        client_socket.shutdown(socket.SHUT_WR)  # Signal no more data will be sent
-        print("Client socket shutdown for writing.")
+        client_socket.shutdown(socket.SHUT_WR)  
+        print("Client socket shutdown.")
     except FileNotFoundError:
         print(f"Error: File '{file_path}' not found.")
         sys.exit(1)
@@ -27,7 +25,6 @@ def send_file_content(client_socket, file_path):
         sys.exit(1)
 
 def receive_response(client_socket):
-    """Receive the response from the server."""
     try:
         response = client_socket.recv(BUFFER_SIZE).decode()
         print(f"Server response: {response}")
@@ -36,7 +33,6 @@ def receive_response(client_socket):
         sys.exit(1)
 
 def start_client(server_ip, server_port, file_path):
-    """Start the client, send the file content, and receive the server's response."""
     try:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.connect((server_ip, server_port))
@@ -47,8 +43,6 @@ def start_client(server_ip, server_port, file_path):
     finally:
         client_socket.close()
 
-# ---- Entry Point with Argument Parsing ----
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Send file content to TCP server.')
     parser.add_argument('--ip', type=str, required=True, help='Server IP address')
@@ -57,7 +51,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Ensure the file exists
     if not os.path.exists(args.file):
         print(f"Error: File '{args.file}' does not exist.")
         sys.exit(1)

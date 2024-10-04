@@ -1,9 +1,9 @@
 import socket
 import os
 import threading
-import sys  # Import sys for sys.exit
+import sys
 
-BUFFER_SIZE = 4096  # Same buffer size as client
+BUFFER_SIZE = 4096
 
 def count_alphabetic_chars(file_data):
     return sum(c.isalpha() for c in file_data)
@@ -21,14 +21,22 @@ def get_local_ip():
 
 def validate_port(port):
     if not (1024 <= port <= 65535):
-        raise ValueError(f"Invalid port number: {port}. Port must be between 1024 and 65535.")
+        print(f"Invalid port number: {port}. Port must be between 1024 and 65535.")
+        sys.exit(1)
 
 def create_server_socket(port):
-    validate_port(port)  # Validate the port number before proceeding
+    validate_port(port)
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Enable address reuse
-    server_socket.bind(('0.0.0.0', port))
-    server_socket.listen(5)  # Allow up to 5 clients to queue
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        server_socket.bind(('0.0.0.0', port))
+    except OSError as e:
+        if e.errno == 98:
+            print(f"Error: Port {port} is already in use. Please use a different port or stop the running server.")
+        else:
+            print(f"Unexpected error: {e}")
+        return None
+    server_socket.listen(5)
     print(f"Server is listening on port {port}...")
     return server_socket
 
@@ -38,41 +46,33 @@ def accept_client_connection(server_socket):
     return client_socket
 
 def receive_file_from_client(client_socket):
-    """Receive file data sent by the client."""
-    file_data = b""  # Accumulate file data here
+    file_data = b""
     while True:
         data = client_socket.recv(BUFFER_SIZE)
-        if not data:  # No more data from the client, end of file transfer
+        if not data:
             print("No more data from client, file transfer complete.")
             break
-        file_data += data  # Append received data
-        print(f"Received {len(data)} bytes from client.")  # Debugging line
-    print("File data received successfully.")  # Debugging line
+        file_data += data
+        print(f"Received {len(data)} bytes from client.")
+    print("File data received successfully.")
     return file_data
 
 def send_response_to_client(client_socket, response):
-    """Send response back to the client."""
-    print(f"Sending response to client: {response}")  # Debugging line
+    print(f"Sending response to client: {response}")
     client_socket.sendall(response.encode())
 
 def handle_client(client_socket):
-    """Handle the communication with a single client."""
     try:
         file_data = receive_file_from_client(client_socket)
-
         try:
-            file_text = file_data.decode()  # Debugging line to check for errors in decoding
-            print("File data decoded successfully.")  # Debugging line
+            file_text = file_data.decode()
+            print("File data decoded successfully.")
         except UnicodeDecodeError as e:
             print(f"Error decoding file data: {e}")
             client_socket.close()
             return
-
-        # Count the number of alphabetic characters
         letter_count = count_alphabetic_chars(file_text)
         print(f'Counted {letter_count} alphabetic characters in the received file.')
-
-        # Send the letter count back to the client
         response = f"Alphabetic character count: {letter_count}"
         send_response_to_client(client_socket, response)
     except Exception as e:
@@ -81,31 +81,24 @@ def handle_client(client_socket):
         client_socket.close()
         print("Client connection closed.")
 
-# ---- Server Control Flow ----
-
 def start_server(port):
-    """Start the server and handle client requests."""
     local_ip = get_local_ip()
     print(f"Server IP address: {local_ip}")
     
-    server_socket = None  # Initialize to ensure it's accessible in the finally block
+    server_socket = create_server_socket(port)
+    if server_socket is None:
+        sys.exit(1)
+    
     try:
-        server_socket = create_server_socket(port)
         while True:
             client_socket = accept_client_connection(server_socket)
             client_thread = threading.Thread(target=handle_client, args=(client_socket,))
             client_thread.start()
     except KeyboardInterrupt:
         print("\nServer shutting down.")
-    except ValueError as e:
-        print(f"Error: {e}")
-        sys.exit(1)
     finally:
-        # Only attempt to close the server socket if it was successfully created
         if server_socket:
             server_socket.close()
-
-# ---- Entry Point with Argument Parsing ----
 
 if __name__ == "__main__":
     import argparse
@@ -114,8 +107,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    try:
-        start_server(args.port)
-    except ValueError as e:
-        print(f"Error: {e}")
-        sys.exit(1)
+    start_server(args.port)
