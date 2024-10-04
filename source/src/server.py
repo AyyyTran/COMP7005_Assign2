@@ -42,7 +42,7 @@ def create_server_socket(port):
 
 def accept_client_connection(server_socket):
     client_socket, client_address = server_socket.accept()
-    print(f"Client connected from {client_address}.")
+    print(f"Client conected from {client_address}.")
     return client_socket
 
 def receive_file_from_client(client_socket):
@@ -54,7 +54,7 @@ def receive_file_from_client(client_socket):
             break
         file_data += data
         print(f"Received {len(data)} bytes from client.")
-    print("File data received successfully.")
+    print("File data received succesfully.")
     return file_data
 
 def send_response_to_client(client_socket, response):
