@@ -35,6 +35,7 @@ def create_server_socket(port):
             print(f"Unexpected error: {e}")
         return None
     server_socket.listen(5)
+    server_socket.settimeout(1)  
     print(f"Server is listening on port {port}...")
     return server_socket
 
@@ -43,6 +44,8 @@ def accept_client_connection(server_socket):
         client_socket, client_address = server_socket.accept()
         print(f"Client connected from {client_address}.")
         return client_socket
+    except socket.timeout:
+        return None  
     except KeyboardInterrupt:
         print("\nServer shutting down while waiting for a connection.")
         server_socket.close()
@@ -108,7 +111,8 @@ def start_server(port):
         while True:
             try:
                 client_socket = accept_client_connection(server_socket)
-                handle_client(client_socket)
+                if client_socket:
+                    handle_client(client_socket)
             except KeyboardInterrupt:
                 print("\nServer shutting down.")
                 break
