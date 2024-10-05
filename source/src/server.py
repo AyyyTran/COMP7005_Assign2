@@ -1,6 +1,4 @@
 import socket
-import os
-import threading
 import sys
 
 BUFFER_SIZE = 4096
@@ -41,25 +39,40 @@ def create_server_socket(port):
     return server_socket
 
 def accept_client_connection(server_socket):
-    client_socket, client_address = server_socket.accept()
-    print(f"Client conected from {client_address}.")
-    return client_socket
+    try:
+        client_socket, client_address = server_socket.accept()
+        print(f"Client connected from {client_address}.")
+        return client_socket
+    except KeyboardInterrupt:
+        print("\nServer shutting down while waiting for a connection.")
+        server_socket.close()
+        sys.exit(0)
 
 def receive_file_from_client(client_socket):
     file_data = b""
-    while True:
-        data = client_socket.recv(BUFFER_SIZE)
-        if not data:
-            print("No more data from client, file transfer complete.")
-            break
-        file_data += data
-        print(f"Received {len(data)} bytes from client.")
-    print("File data received succesfully.")
+    try:
+        while True:
+            data = client_socket.recv(BUFFER_SIZE)
+            if not data:
+                print("No more data from client, file transfer complete.")
+                break
+            file_data += data
+            print(f"Received {len(data)} bytes from client.")
+    except KeyboardInterrupt:
+        print("\nTransfer interrupted by server. Closing connection.")
+        client_socket.close()
+        sys.exit(0)
+    except socket.error as e:
+        print(f"Socket error during file transfer: {e}")
+    print("File data received successfully.")
     return file_data
 
 def send_response_to_client(client_socket, response):
     print(f"Sending response to client: {response}")
-    client_socket.sendall(response.encode())
+    try:
+        client_socket.sendall(response.encode())
+    except socket.error as e:
+        print(f"Error sending response to client: {e}")
 
 def handle_client(client_socket):
     try:
@@ -69,12 +82,14 @@ def handle_client(client_socket):
             print("File data decoded successfully.")
         except UnicodeDecodeError as e:
             print(f"Error decoding file data: {e}")
-            client_socket.close()
             return
         letter_count = count_alphabetic_chars(file_text)
         print(f'Counted {letter_count} alphabetic characters in the received file.')
         response = f"Alphabetic character count: {letter_count}"
         send_response_to_client(client_socket, response)
+    except KeyboardInterrupt:
+        print("\nServer interrupted while processing client. Shutting down.")
+        sys.exit(0)
     except Exception as e:
         print(f"Error handling client: {e}")
     finally:
@@ -91,14 +106,16 @@ def start_server(port):
     
     try:
         while True:
-            client_socket = accept_client_connection(server_socket)
-            client_thread = threading.Thread(target=handle_client, args=(client_socket,))
-            client_thread.start()
-    except KeyboardInterrupt:
-        print("\nServer shutting down.")
+            try:
+                client_socket = accept_client_connection(server_socket)
+                handle_client(client_socket)
+            except KeyboardInterrupt:
+                print("\nServer shutting down.")
+                break
     finally:
         if server_socket:
             server_socket.close()
+            print("Server socket closed.")
 
 if __name__ == "__main__":
     import argparse
