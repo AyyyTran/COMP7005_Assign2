@@ -112,6 +112,8 @@ def start_server(port):
             except KeyboardInterrupt:
                 print("\nServer shutting down.")
                 break
+    except KeyboardInterrupt:
+        print("\nServer interrupted (Ctrl+C). Shutting down...")
     finally:
         if server_socket:
             server_socket.close()
