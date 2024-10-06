@@ -1,92 +1,128 @@
 import socket
-import argparse
-import os
 import sys
 
-BUFFER_SIZE = 4096  
+BUFFER_SIZE = 4096
 
-def send_file_content(client_socket, file_path):
-    if not file_path.endswith('.txt'):
-        print("Error: Only .txt files are supported.")
-        client_socket.close()
-        sys.exit(1)
+def count_alphabetic_chars(file_data):
+    return sum(c.isalpha() for c in file_data)
 
-    if not os.access(file_path, os.R_OK):
-        print(f"Error: No read permission for the file '{file_path}'.")
-        client_socket.close()
-        sys.exit(1)
-
+def get_local_ip():
     try:
-        with open(file_path, 'rb') as file:
-            while True:
-                data = file.read(BUFFER_SIZE)
-                if not data:
-                    print("Finished sending file data.")
-                    break
-                client_socket.sendall(data)
-        client_socket.shutdown(socket.SHUT_WR)
-        print("Client socket shutdown.")
-    except FileNotFoundError:
-        print(f"Error: File '{file_path}' not found.")
-        client_socket.close()
-        sys.exit(1)
-    except socket.error as e:
-        print(f"Error sending file content: {e}")
-        client_socket.close()
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        return local_ip
+    except Exception as e:
+        print(f"Error retrieving local IP address: {e}")
+        return "Unable to retrieve local IP."
+
+def validate_port(port):
+    if not (1024 <= port <= 65535):
+        print(f"Invalid port number: {port}. Port must be between 1024 and 65535.")
         sys.exit(1)
 
-def receive_response(client_socket):
+def create_server_socket(port):
+    validate_port(port)
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
-        response = client_socket.recv(BUFFER_SIZE).decode()
-        print(f"Server response: {response}")
-    except socket.error as e:
-        print(f"Error receiving response: {e}")
-        sys.exit(1)
+        server_socket.bind(('0.0.0.0', port))
+    except OSError as e:
+        if e.errno == 98:
+            print(f"Error: Port {port} is already in use. Please use a different port or stop the running server.")
+        else:
+            print(f"Unexpected error: {e}")
+        return None
+    server_socket.listen(5)
+    server_socket.settimeout(1)  
+    print(f"Server is listening on port {port}...")
+    return server_socket
 
-def start_client(server_ip, server_port, file_path):
+def accept_client_connection(server_socket):
     try:
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.settimeout(5)
-        client_socket.connect((server_ip, server_port))
-        print(f"Connected to server at {server_ip}:{server_port}")
-
-        send_file_content(client_socket, file_path)
-        receive_response(client_socket)
-    except socket.gaierror:
-        print(f"Error: Unable to resolve the server address '{server_ip}'. Please check if the IP address or hostname is correct.")
-        sys.exit(1)
+        client_socket, client_address = server_socket.accept()
+        print(f"Client connected ...")
+        return client_socket
     except socket.timeout:
-        print(f"Error: Connection to {server_ip}:{server_port} timed out.")
-        sys.exit(1)
+        return None  
+    except KeyboardInterrupt:
+        print("\nServer shutting down while waiting for a connection.")
+        server_socket.close()
+        sys.exit(0)
+
+def receive_file_from_client(client_socket):
+    file_data = b""
+    try:
+        while True:
+            data = client_socket.recv(BUFFER_SIZE)
+            if not data:
+                break
+            file_data += data
+    except KeyboardInterrupt:
+        print("\nTransfer interrupted by server. Closing connection.")
+        client_socket.close()
+        sys.exit(0)
     except socket.error as e:
-        print(f"Error: Could not connect to {server_ip}:{server_port}. Please check if the IP address is correct and the server is running.")
-        print(f"Details: {e}")
-        sys.exit(1)
+        print(f"Socket error during file transfer: {e}")
+    return file_data
+
+def send_response_to_client(client_socket, response):
+    try:
+        client_socket.sendall(response.encode())
+    except socket.error as e:
+        print(f"Error sending response to client: {e}")
+
+def handle_client(client_socket):
+    try:
+        file_data = receive_file_from_client(client_socket)
+        try:
+            file_text = file_data.decode()
+        except UnicodeDecodeError as e:
+            print(f"Error decoding file data: {e}")
+            return
+        letter_count = count_alphabetic_chars(file_text)
+        response = f"Alphabetic character count: {letter_count}"
+        send_response_to_client(client_socket, response)
+        print(f"Processed file: counted {letter_count} alphabetic characters.")
+    except KeyboardInterrupt:
+        print("\nServer interrupted while processing client. Shutting down.")
+        sys.exit(0)
+    except Exception as e:
+        print(f"Error handling client: {e}")
     finally:
         client_socket.close()
+        print(f"Client disconeccted.")
+
+def start_server(port):
+    local_ip = get_local_ip()
+    print(f"Server IP address: {local_ip}")
+    
+    server_socket = create_server_socket(port)
+    if server_socket is None:
+        sys.exit(1)
+    
+    try:
+        while True:
+            try:
+                client_socket = accept_client_connection(server_socket)
+                if client_socket:
+                    handle_client(client_socket)
+            except KeyboardInterrupt:
+                print("\nServer shutting down.")
+                break
+    except KeyboardInterrupt:
+        print("\nServer interrupted (Ctrl+C). Shutting down...")
+    finally:
+        if server_socket:
+            server_socket.close()
+            print("Server socket closed.")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Send a single file content to TCP server.')
-    parser.add_argument('--ip', type=str, required=True, help='Server IP address')
-    parser.add_argument('--port', type=int, required=True, help='Server port number')
-    parser.add_argument('--file', type=str, required=True, help='Path to the .txt file to send')
+    import argparse
+    parser = argparse.ArgumentParser(description='TCP server for receiving and processing file content.')
+    parser.add_argument('--port', type=int, required=True, help='Port number for the server to listen on')
 
     args = parser.parse_args()
 
-    if isinstance(args.file, list) and len(args.file) > 1:
-        print("Error: Multiple files provided. Please send only one file per connection.")
-        sys.exit(1)
-
-    if not args.file.endswith('.txt'):
-        print("Error: Only .txt files are allowed.")
-        sys.exit(1)
-
-    if not os.path.exists(args.file):
-        print(f"Error: File '{args.file}' does not exist.")
-        sys.exit(1)
-
-    if not (1024 <= args.port <= 65535):
-        print(f"Error: Port number {args.port} is invalid. It must be between 1024 and 65535.")
-        sys.exit(1)
-
-    start_client(args.ip, args.port, args.file)
+    start_server(args.port)
