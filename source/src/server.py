@@ -92,6 +92,7 @@ def handle_client(client_socket):
         print(f"Error handling client: {e}")
     finally:
         client_socket.close()
+        print(f"Client disconeccted.")
 
 def start_server(port):
     local_ip = get_local_ip()
