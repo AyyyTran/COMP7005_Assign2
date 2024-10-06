@@ -43,7 +43,12 @@ def receive_response(client_socket):
         print(f"Error receiving response: {e}")
         sys.exit(1)
 
-def start_client(server_ip, server_port, file_path):
+def start_client(server_ip, server_port, file_paths):
+    if len(file_paths) > 1:
+        print("Error: Only one file can be sent per connection.")
+        sys.exit(1)
+
+    file_path = file_paths[0]
     try:
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.settimeout(5)
@@ -63,26 +68,28 @@ def start_client(server_ip, server_port, file_path):
         print(f"Details: {e}")
         sys.exit(1)
     except KeyboardInterrupt:
-        print("\nConnection attempt interrupted by user. Exiting...")
+        print("\nClient interrupted by user during connection attempt. Exiting...")
         sys.exit(1)
     finally:
-        client_socket.close()
+        if 'client_socket' in locals():
+            client_socket.close()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Send a single file content to TCP server.')
+    parser = argparse.ArgumentParser(description='Send file content to TCP server.')
     parser.add_argument('--ip', type=str, required=True, help='Server IP address')
     parser.add_argument('--port', type=int, required=True, help='Server port number')
-    parser.add_argument('--file', type=str, required=True, help='Path to the .txt file to send')
+    parser.add_argument('--file', type=str, required=True, nargs='+', help='Path to the .txt file(s) to send')
 
     args = parser.parse_args()
 
-    if not args.file.endswith('.txt'):
-        print("Error: Only .txt files are allowed.")
-        sys.exit(1)
+    for file in args.file:
+        if not file.endswith('.txt'):
+            print("Error: Only .txt files are allowed.")
+            sys.exit(1)
 
-    if not os.path.exists(args.file):
-        print(f"Error: File '{args.file}' does not exist.")
-        sys.exit(1)
+        if not os.path.exists(file):
+            print(f"Error: File '{file}' does not exist.")
+            sys.exit(1)
 
     if not (1024 <= args.port <= 65535):
         print(f"Error: Port number {args.port} is invalid. It must be between 1024 and 65535.")
