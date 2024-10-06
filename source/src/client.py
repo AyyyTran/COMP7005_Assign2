@@ -62,21 +62,19 @@ def start_client(server_ip, server_port, file_path):
         print(f"Error: Could not connect to {server_ip}:{server_port}. Please check if the IP address is correct and the server is running.")
         print(f"Details: {e}")
         sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nConnection attempt interrupted by user. Exiting...")
+        sys.exit(1)
     finally:
         client_socket.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Send a single file content to TCP server.')
-    
     parser.add_argument('--ip', type=str, required=True, help='Server IP address')
     parser.add_argument('--port', type=int, required=True, help='Server port number')
     parser.add_argument('--file', type=str, required=True, help='Path to the .txt file to send')
 
     args = parser.parse_args()
-
-    if len(sys.argv) != 7: 
-        print("Error: Too many arguments please provide one each.")
-        sys.exit(1)
 
     if not args.file.endswith('.txt'):
         print("Error: Only .txt files are allowed.")
@@ -90,4 +88,8 @@ if __name__ == "__main__":
         print(f"Error: Port number {args.port} is invalid. It must be between 1024 and 65535.")
         sys.exit(1)
 
-    start_client(args.ip, args.port, args.file)
+    try:
+        start_client(args.ip, args.port, args.file)
+    except KeyboardInterrupt:
+        print("\nClient interrupted by user. Exiting...")
+        sys.exit(1)
