@@ -57,21 +57,17 @@ def receive_file_from_client(client_socket):
         while True:
             data = client_socket.recv(BUFFER_SIZE)
             if not data:
-                print("No more data from client, file transfer complete.")
                 break
             file_data += data
-            print(f"Received {len(data)} bytes from client.")
     except KeyboardInterrupt:
         print("\nTransfer interrupted by server. Closing connection.")
         client_socket.close()
         sys.exit(0)
     except socket.error as e:
         print(f"Socket error during file transfer: {e}")
-    print("File data received successfully.")
     return file_data
 
 def send_response_to_client(client_socket, response):
-    print(f"Sending response to client: {response}")
     try:
         client_socket.sendall(response.encode())
     except socket.error as e:
@@ -82,14 +78,13 @@ def handle_client(client_socket):
         file_data = receive_file_from_client(client_socket)
         try:
             file_text = file_data.decode()
-            print("File data decoded successfully.")
         except UnicodeDecodeError as e:
             print(f"Error decoding file data: {e}")
             return
         letter_count = count_alphabetic_chars(file_text)
-        print(f'Counted {letter_count} alphabetic characters in the received file.')
         response = f"Alphabetic character count: {letter_count}"
         send_response_to_client(client_socket, response)
+        print(f"Processed file: counted {letter_count} alphabetic characters.")
     except KeyboardInterrupt:
         print("\nServer interrupted while processing client. Shutting down.")
         sys.exit(0)
@@ -97,7 +92,6 @@ def handle_client(client_socket):
         print(f"Error handling client: {e}")
     finally:
         client_socket.close()
-        print("Client connection closed.")
 
 def start_server(port):
     local_ip = get_local_ip()

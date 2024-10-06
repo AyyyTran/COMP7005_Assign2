@@ -34,6 +34,10 @@ def send_file_content(client_socket, file_path):
         print(f"Error sending file content: {e}")
         client_socket.close()
         sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nFile transfer interrupted by user. Closing connection...")
+        client_socket.close()
+        sys.exit(1)
 
 def receive_response(client_socket):
     try:
@@ -41,6 +45,10 @@ def receive_response(client_socket):
         print(f"Server response: {response}")
     except socket.error as e:
         print(f"Error receiving response: {e}")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nConnection interrupted by user. Closing connection...")
+        client_socket.close()
         sys.exit(1)
 
 def start_client(server_ip, server_port, file_path):
@@ -62,8 +70,12 @@ def start_client(server_ip, server_port, file_path):
         print(f"Error: Could not connect to {server_ip}:{server_port}. Please check if the IP address is correct and the server is running.")
         print(f"Details: {e}")
         sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nClient connection interrupted by user. Exiting...")
+        sys.exit(1)
     finally:
-        client_socket.close()
+        if 'client_socket' in locals():
+            client_socket.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Send a single file content to TCP server.')
