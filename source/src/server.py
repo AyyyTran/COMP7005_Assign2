@@ -42,7 +42,7 @@ def create_server_socket(port):
 def accept_client_connection(server_socket):
     try:
         client_socket, client_address = server_socket.accept()
-        print(f"Client connected from {client_address}.")
+        print(f"Client connected ...")
         return client_socket
     except socket.timeout:
         return None  
